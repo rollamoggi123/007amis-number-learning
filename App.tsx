@@ -4,11 +4,24 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, runTransaction, collection, getDoc } from 'firebase/firestore';
 import { Settings, User, Play, Save, Edit3, Volume2, RotateCcw, Users, Music, ChevronLeft, ChevronRight, QrCode, Zap, UserCog, Trash2, Plus, Image as ImageIcon, Eye, EyeOff, AlertCircle, PenTool } from 'lucide-react';
 
-// --- Firebase Configuration ---
+// --- Firebase Configuration & Initialization ---
 const getFirebaseConfig = () => {
-  if (typeof __firebase_config !== 'undefined') {
-    return JSON.parse(__firebase_config);
+  // 1. 嘗試讀取預覽環境設定 (解決 Canvas 預覽報錯問題)
+  try {
+    if (typeof __firebase_config !== 'undefined') {
+      const sysConfig = JSON.parse(__firebase_config);
+      // 嚴格檢查：只有當系統設定包含 apiKey 時才使用
+      if (sysConfig && sysConfig.apiKey) {
+        console.log("Using System Firebase Config");
+        return sysConfig;
+      }
+    }
+  } catch (e) {
+    console.warn("System config invalid, falling back to user config.");
   }
+  
+  // 2. 如果系統設定無效或不存在 (例如在 GitHub Pages)，使用您的正式設定
+  console.log("Using User Firebase Config (amis-number-learning)");
   return {
     apiKey: "AIzaSyBKTAj-f_WeXIiFc3pNTqRX1T24yF11EOw",
     authDomain: "amis-number-learning.firebaseapp.com",
@@ -24,8 +37,8 @@ const app = initializeApp(getFirebaseConfig());
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// 房間 ID：使用 room_25
-const ROOM_ID = 'room_25'; 
+// 房間 ID：使用 room_27 (確保資料乾淨)
+const ROOM_ID = 'room_27'; 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'monopoly-production-v1';
 
 // --- Default Data ---
@@ -723,7 +736,15 @@ export default function MonopolyGame() {
                 </div>
             </div>
             <div className="flex gap-2">
-                {isJoined && <button onClick={() => setShowPlayerModal(true)} className="p-3 bg-white rounded-full shadow hover:bg-blue-50 text-blue-600 transition-colors" title="管理學生名單"><UserCog className="w-6 h-6"/></button>}
+                {isJoined && (
+                    <button 
+                        onClick={() => setShowPlayerModal(true)}
+                        className="p-3 bg-white rounded-full shadow hover:bg-blue-50 text-blue-600 transition-colors" 
+                        title="管理學生名單"
+                    >
+                        <UserCog className="w-6 h-6"/>
+                    </button>
+                )}
                 <button onClick={playBGM} className="p-3 bg-white rounded-full shadow hover:bg-blue-50 text-blue-600 transition-colors" title="背景音樂"><Music className="w-6 h-6"/></button>
                 <button onClick={() => setIsEditing(!isEditing)} className={`p-3 rounded-full shadow transition-colors ${isEditing ? 'bg-yellow-500 text-white' : 'bg-white text-slate-600 hover:bg-gray-50'}`} title="編輯模式"><Settings className="w-6 h-6" /></button>
             </div>
@@ -821,7 +842,19 @@ export default function MonopolyGame() {
              <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-slate-100 overflow-hidden"><img src="https://res.cloudinary.com/dm1ksvptk/image/upload/v1749659604/vxem1akzssudvs0neffn.png" alt="Logo" className="w-full h-full object-cover"/></div>
              <h2 className="text-2xl font-bold text-gray-800 mb-1">歡迎來到族語大富翁</h2>
              <p className="text-gray-500 mb-4">馬蘭阿美語 生活會話篇 第11課</p>
-             <div className="mb-6 flex flex-col items-center justify-center bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/game`} alt="Scan to join" className="w-32 h-32 mb-2 opacity-80"/><span className="text-xs text-gray-500 flex items-center gap-1"><QrCode className="w-3 h-3"/> 掃描加入遊戲 (學生用)</span></div>
+             
+             {/* QR Code */}
+             <div className="mb-6 flex flex-col items-center justify-center bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
+                 <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/game`} 
+                    alt="Scan to join" 
+                    className="w-32 h-32 mb-2 opacity-80"
+                 />
+                 <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <QrCode className="w-3 h-3"/> 掃描加入遊戲 (學生用)
+                 </span>
+             </div>
+
              <div className="border-t border-gray-200 my-4 pt-4">
                 <p className="text-sm font-bold text-gray-600 mb-3">教師演示區</p>
                 <div className="flex gap-2 mb-4">
@@ -829,15 +862,66 @@ export default function MonopolyGame() {
                     <button onClick={() => setShowSetupModal(true)} className="flex-1 bg-teal-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-teal-700 transition-all flex items-center justify-center gap-2"><PenTool className="fill-current w-5 h-5" /> 手動建立名單</button>
                 </div>
              </div>
-             <div className="relative flex py-2 items-center"><div className="flex-grow border-t border-gray-300"></div><span className="flex-shrink-0 mx-4 text-gray-400 text-xs">或單獨加入 (最多7組)</span><div className="flex-grow border-t border-gray-300"></div></div>
-             <div className="mb-4 mt-2"><input type="text" placeholder="輸入隊伍名稱" className="w-full text-center text-lg border-2 border-gray-200 rounded-xl p-3 focus:border-amber-500 outline-none" value={localPlayerName} onChange={e => setLocalPlayerName(e.target.value)} onKeyDown={e => e.key === 'Enter' && joinGame()}/></div>
-             <button onClick={joinGame} disabled={!localPlayerName.trim()} className="w-full bg-amber-500 text-white text-xl font-bold py-3 rounded-xl shadow-lg hover:bg-amber-600 disabled:opacity-50 transition-all flex items-center justify-center gap-2"><Play className="fill-current w-5 h-5" /> 開始遊戲</button>
-             <p className="mt-4 text-xs text-gray-400">目前已有 {gameState.players.length} 組玩家加入</p>
+
+             <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-gray-300"></div>
+                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">或單獨加入 (最多7組)</span>
+                <div className="flex-grow border-t border-gray-300"></div>
+             </div>
+
+             <div className="mb-4 mt-2">
+                <input 
+                  type="text" 
+                  placeholder="輸入隊伍名稱" 
+                  className="w-full text-center text-lg border-2 border-gray-200 rounded-xl p-3 focus:border-amber-500 outline-none"
+                  value={localPlayerName}
+                  onChange={e => setLocalPlayerName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && joinGame()}
+                />
+             </div>
+             
+             <button 
+               onClick={joinGame}
+               disabled={!localPlayerName.trim()}
+               className="w-full bg-amber-500 text-white text-xl font-bold py-3 rounded-xl shadow-lg hover:bg-amber-600 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+             >
+               <Play className="fill-current w-5 h-5" />
+               開始遊戲
+             </button>
+
+             <p className="mt-4 text-xs text-gray-400">
+                目前已有 {gameState.players.length} 組玩家加入
+             </p>
         </div>
       )}
-      {isEditing && selectedCell && <EditModal selectedCell={selectedCell} onClose={() => setSelectedCell(null)} onSave={updateGridCell} />}
-      {isEditing && editingSentenceIndex !== null && <SentenceEditModal index={editingSentenceIndex} sentence={gameState.sentences[editingSentenceIndex]} onClose={() => setEditingSentenceIndex(null)} onSave={updateSentence} />}
-      {showPlayerModal && <PlayerListModal players={gameState.players} onClose={() => setShowPlayerModal(false)} onUpdatePlayers={updatePlayersList} />}
+
+      {/* Modals */}
+      {isEditing && selectedCell && (
+        <EditModal 
+          selectedCell={selectedCell} 
+          onClose={() => setSelectedCell(null)} 
+          onSave={updateGridCell} 
+        />
+      )}
+
+      {/* Sentence Edit Modal */}
+      {isEditing && editingSentenceIndex !== null && (
+        <SentenceEditModal
+          index={editingSentenceIndex}
+          sentence={gameState.sentences[editingSentenceIndex]}
+          onClose={() => setEditingSentenceIndex(null)}
+          onSave={updateSentence}
+        />
+      )}
+
+      {/* Player List Modal (Shared) */}
+      {showPlayerModal && (
+          <PlayerListModal 
+             players={gameState.players} 
+             onClose={() => setShowPlayerModal(false)}
+             onUpdatePlayers={updatePlayersList}
+          />
+      )}
       
       {/* 新增：啟動畫面時的手動設定 Modal (重複使用 PlayerListModal，但傳入不同的回調) */}
       {showSetupModal && (
