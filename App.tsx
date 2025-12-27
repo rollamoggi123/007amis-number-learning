@@ -1,0 +1,854 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, runTransaction, collection, getDoc } from 'firebase/firestore';
+import { Settings, User, Play, Save, Edit3, Volume2, RotateCcw, Users, Music, ChevronLeft, ChevronRight, QrCode, Zap, UserCog, Trash2, Plus, Image as ImageIcon, Eye, EyeOff, AlertCircle, PenTool } from 'lucide-react';
+
+// --- Firebase Configuration ---
+const getFirebaseConfig = () => {
+  if (typeof __firebase_config !== 'undefined') {
+    return JSON.parse(__firebase_config);
+  }
+  return {
+    apiKey: "AIzaSyBKTAj-f_WeXIiFc3pNTqRX1T24yF11EOw",
+    authDomain: "amis-number-learning.firebaseapp.com",
+    projectId: "amis-number-learning",
+    storageBucket: "amis-number-learning.firebasestorage.app",
+    messagingSenderId: "465552053506",
+    appId: "1:465552053506:web:038dbdbd4e9389fe4f5e1b",
+    measurementId: "G-W8W1N2LS6V"
+  };
+};
+
+const app = initializeApp(getFirebaseConfig());
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// 房間 ID：使用 room_25
+const ROOM_ID = 'room_25'; 
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'monopoly-production-v1';
+
+// --- Default Data ---
+const GRID_LAYOUT = [
+  { id: 'a', area: 'a', defaultLabel: "cecay", defaultColor: '#bae6fd', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766833615/1_cecay_pwaqo9.jpg' }, 
+  { id: 'b', area: 'b', defaultLabel: 'tosa', defaultColor: '#ffe8b3', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766835102/2_d4uspg.png' },
+  { id: 'c', area: 'c', defaultLabel: 'tolo', defaultColor: '#fb8c00', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766835199/3_v9nmob.png' },
+  { id: 'd', area: 'd', defaultLabel: 'sepat', defaultColor: '#bae6fd', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766835214/4_rcu9ld.png' },
+  { id: 'e', area: 'e', defaultLabel: 'lima', defaultColor: '#ffe8b3', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766835308/5_slpohd.png' },
+  { id: 'f', area: 'f', defaultLabel: 'enem', defaultColor: '#e63946', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766835373/6_u3xlq9.png' },
+  { id: 'g', area: 'g', defaultLabel: 'pito', defaultColor: '#f48fb1', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766835444/7_jgkd0a.png' },
+  { id: 'h', area: 'h', defaultLabel: 'falo', defaultColor: '#bae6fd', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766836039/8_ksomjx.png' }, 
+  { id: 'i', area: 'i', defaultLabel: 'siwa', defaultColor: '#f48fb1', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766836115/9_ptywp8.png' }, 
+  { id: 'j', area: 'j', defaultLabel: 'moetep', defaultColor: '#66bb6a', defaultSound: '', textColor: '#1e3a8a', defaultImage: 'https://res.cloudinary.com/dm1ksvptk/image/upload/v1766836190/10_ewv3y8.png' }, 
+  { id: 'o', area: 'o', defaultLabel: "tosa polo'", defaultColor: '#ba68c8', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 'p', area: 'p', defaultLabel: "tolo polo'", defaultColor: '#e63946', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 'q', area: 'q', defaultLabel: "sepat polo'", defaultColor: '#ba68c8', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 'r', area: 'r', defaultLabel: "lima polo'", defaultColor: '#ffe8b3', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 's', area: 's', defaultLabel: "enem polo'", defaultColor: '#ba68c8', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 't', area: 't', defaultLabel: "pito polo'", defaultColor: '#e63946', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 'u', area: 'u', defaultLabel: "falo polo'", defaultColor: '#ffe8b3', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 'v', area: 'v', defaultLabel: "siwa polo'", defaultColor: '#fdd835', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 'w', area: 'w', defaultLabel: "somo'ot", defaultColor: '#e63946', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+  { id: 'x', area: 'x', defaultLabel: "cowa kafana' kako", defaultColor: '#ffe8b3', defaultSound: '', textColor: '#1e3a8a', defaultImage: '' },
+];
+
+const PATH_ORDER = ['a','b','c','d','e','f','g','h','i','j','o','p','q','r','s','t','u','v','w','x'];
+
+const PLAYER_COLORS = [
+  { name: 'Red', value: '#ef4444' },    
+  { name: 'Blue', value: '#3b82f6' },   
+  { name: 'Green', value: '#22c55e' },  
+  { name: 'Yellow', value: '#eab308' }, 
+  { name: 'Purple', value: '#a855f7' }, 
+  { name: 'Teal', value: '#14b8a6' },   
+  { name: 'Pink', value: '#ec4899' }    
+];
+
+const DEFAULT_SENTENCES = [
+  "Pina ko miheca'an no miso",
+  "Papinaay ko salikaka no miso?"
+];
+
+// --- Styles ---
+const styles = `
+.game-grid {
+  display: grid;
+  grid-template-areas:
+      'a b c d e f'
+      'x center center center center g'
+      'w center center center center h'
+      'v center center center center i'
+      'u center center center center j'
+      't s r q p o';
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(6, minmax(80px, 1fr));
+  gap: 6px;
+  width: 100%;
+  aspect-ratio: 1/1;
+  max-width: 900px;
+  background-color: #475569;
+  padding: 8px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.grid-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
+  justify-content: center;
+  border: 3px solid rgba(0,0,0,0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: inset 0 2px 5px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.2);
+  padding: 4px;
+}
+
+.grid-cell:hover {
+  transform: translateY(-2px);
+  z-index: 10;
+}
+
+.grid-cell.active {
+  box-shadow: 0 0 0 4px #fbbf24, 0 0 20px #fbbf24;
+  z-index: 20;
+  transform: scale(1.05);
+}
+
+.token-container {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 70%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.grid-center {
+  grid-area: center;
+  background-color: #1e293b;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  background-image: radial-gradient(circle at center, #334155 0%, #1e293b 100%);
+  position: relative;
+}
+
+.dice-3d {
+  width: 80px;
+  height: 80px;
+  transform-style: preserve-3d;
+  transition: transform 1s;
+}
+
+.rolling {
+  animation: roll 0.6s linear infinite;
+}
+
+@keyframes roll {
+  0% { transform: rotateX(0deg) rotateY(0deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg); }
+}
+
+.player-token {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  transition: all 0.3s ease-out;
+}
+
+.wood-texture {
+  background-image: linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+`;
+
+// --- EditModal Component ---
+const EditModal = ({ selectedCell, onClose, onSave }) => {
+  const [tempLabel, setTempLabel] = useState(selectedCell.label);
+  const [tempSound, setTempSound] = useState(selectedCell.sound);
+  const [tempColor, setTempColor] = useState(selectedCell.color);
+  const [tempImage, setTempImage] = useState(selectedCell.image || '');
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh]">
+        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+           <Edit3 className="w-5 h-5"/> 編輯格位: {selectedCell.id.toUpperCase()}
+        </h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">顯示文字 (單字)</label>
+            <textarea 
+              value={tempLabel} 
+              onChange={e => setTempLabel(e.target.value)}
+              className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none h-20"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <ImageIcon className="w-4 h-4"/> 圖片連結 (選填)
+            </label>
+            <input 
+              value={tempImage} 
+              onChange={e => setTempImage(e.target.value)}
+              className="w-full border rounded-lg p-2 text-xs font-mono bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="https://..."
+            />
+            {tempImage && (
+                <div className="mt-2 w-full h-24 bg-gray-100 rounded flex items-center justify-center overflow-hidden border">
+                    <img src={tempImage} alt="Preview" className="h-full object-contain"/>
+                </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">背景顏色</label>
+            <div className="flex gap-2 flex-wrap">
+               {['#bae6fd', '#8d6e63', '#ffe8b3', '#fb8c00', '#e63946', '#f48fb1', '#66bb6a', '#ba68c8', '#fdd835', '#1e3a8a'].map(c => (
+                   <button 
+                      key={c}
+                      onClick={() => setTempColor(c)}
+                      className={`w-8 h-8 rounded-full border-2 ${tempColor === c ? 'border-black scale-110' : 'border-transparent'}`}
+                      style={{backgroundColor: c}}
+                   />
+               ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">音檔連結 (MP3)</label>
+            <input 
+              value={tempSound} 
+              onChange={e => setTempSound(e.target.value)}
+              className="w-full border rounded-lg p-2 text-xs font-mono bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="https://..."
+            />
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+          <button onClick={() => onSave(selectedCell.id, { label: tempLabel, color: tempColor, sound: tempSound, image: tempImage })} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+            <Save className="w-4 h-4"/> 儲存修改
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Sentence Edit Modal ---
+const SentenceEditModal = ({ sentence, index, onClose, onSave }) => {
+  const [text, setText] = useState(sentence);
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+           <Edit3 className="w-5 h-5"/> 編輯句型 {index + 1}
+        </h3>
+        <textarea value={text} onChange={e => setText(e.target.value)} className="w-full border rounded-lg p-3 h-32 text-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"/>
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+          <button onClick={() => onSave(index, text)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">儲存</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Player List Modal (Reuse for Setup & Editing) ---
+const PlayerListModal = ({ players, onClose, onUpdatePlayers, title = "學生名單管理", confirmLabel = "儲存變更" }) => {
+    // 如果傳入的 players 為空 (Setup Mode)，預設一個空陣列
+    const [editedPlayers, setEditedPlayers] = useState(players || []);
+    const [newPlayerName, setNewPlayerName] = useState('');
+
+    const handleNameChange = (index, val) => {
+        const newArr = [...editedPlayers];
+        newArr[index] = { ...newArr[index], name: val };
+        setEditedPlayers(newArr);
+    };
+
+    const handleDelete = (index) => {
+        if(confirm('確定要刪除這位玩家嗎？')) {
+            const newArr = editedPlayers.filter((_, i) => i !== index);
+            setEditedPlayers(newArr);
+        }
+    };
+
+    const handleAdd = () => {
+        if (!newPlayerName.trim()) return;
+        const colorIndex = editedPlayers.length % PLAYER_COLORS.length;
+        const newPlayer = {
+            id: `manual-${Date.now()}`,
+            name: newPlayerName,
+            color: PLAYER_COLORS[colorIndex].value,
+            position: 0,
+            score: 0
+        };
+        setEditedPlayers([...editedPlayers, newPlayer]);
+        setNewPlayerName('');
+    };
+
+    const handleSave = () => {
+        if (editedPlayers.length === 0) {
+            alert("請至少新增一位玩家！");
+            return;
+        }
+        onUpdatePlayers(editedPlayers);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl h-[80vh] flex flex-col">
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 border-b pb-2">
+                    <UserCog className="w-6 h-6 text-blue-600"/> {title}
+                </h3>
+                
+                <div className="flex-1 overflow-y-auto space-y-3 p-1">
+                    {editedPlayers.map((p, i) => (
+                        <div key={p.id || i} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border">
+                            <div className="w-6 h-6 rounded-full flex-shrink-0" style={{backgroundColor: p.color}}></div>
+                            <input 
+                                className="flex-1 border-b border-transparent focus:border-blue-500 bg-transparent px-1 outline-none font-medium"
+                                value={p.name}
+                                onChange={(e) => handleNameChange(i, e.target.value)}
+                                placeholder="輸入名字"
+                            />
+                            <button onClick={() => handleDelete(i)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full">
+                                <Trash2 className="w-4 h-4"/>
+                            </button>
+                        </div>
+                    ))}
+
+                    {editedPlayers.length === 0 && <div className="text-center text-gray-400 py-4">目前沒有玩家，請下方新增</div>}
+                </div>
+
+                <div className="mt-4 pt-4 border-t space-y-3">
+                    <div className="flex gap-2">
+                        <input 
+                            className="flex-1 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200"
+                            placeholder="輸入新玩家名稱 (Enter)"
+                            value={newPlayerName}
+                            onChange={e => setNewPlayerName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                        />
+                        <button onClick={handleAdd} className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600">
+                            <Plus className="w-5 h-5"/>
+                        </button>
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                        <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+                        <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                            <Save className="w-4 h-4"/> {confirmLabel}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Main Component ---
+export default function MonopolyGame() {
+  const [user, setUser] = useState(null);
+  const [gameState, setGameState] = useState({
+    players: [],
+    gridData: {},
+    sentences: DEFAULT_SENTENCES,
+    currentTurnIndex: 0,
+    diceValue: 1,
+    isRolling: false,
+    lastActionTimestamp: 0,
+    revealedCells: {} 
+  });
+  
+  const [displayPlayers, setDisplayPlayers] = useState([]);
+  const [localPlayerName, setLocalPlayerName] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [showPlayerModal, setShowPlayerModal] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(false); // 新增：啟動畫面時的手動設定 Modal
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [editingSentenceIndex, setEditingSentenceIndex] = useState(null);
+  const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
+  const [revealedCells, setRevealedCells] = useState({});
+
+  const audioRef = useRef(null);
+  const stepAudioRef = useRef(null); 
+  const bgmRef = useRef(null);
+
+  // --- Initialization ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Auth Error:", error);
+      }
+    };
+    initAuth();
+    const unsubscribeAuth = onAuthStateChanged(auth, setUser);
+    return () => unsubscribeAuth();
+  }, []);
+
+  // Data Sync
+  useEffect(() => {
+    if (!user) return;
+    const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+    
+    const unsubscribe = onSnapshot(gameDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const serverPlayers = data.players || [];
+        setGameState(prev => ({
+          ...data,
+          players: serverPlayers,
+          gridData: data.gridData || {},
+          sentences: data.sentences || DEFAULT_SENTENCES,
+          currentTurnIndex: typeof data.currentTurnIndex === 'number' ? data.currentTurnIndex : 0,
+          diceValue: data.diceValue || 1,
+          isRolling: data.isRolling || false,
+          revealedCells: data.revealedCells || {}
+        }));
+
+        setDisplayPlayers(prevDisplayPlayers => {
+            if (serverPlayers.length < prevDisplayPlayers.length) return serverPlayers; 
+            if (prevDisplayPlayers.length === 0) return serverPlayers;
+
+            const newDisplayPlayers = [...prevDisplayPlayers];
+            let hasChanges = false;
+            
+            serverPlayers.forEach((serverPlayer, index) => {
+                if (!newDisplayPlayers[index]) {
+                    newDisplayPlayers[index] = serverPlayer;
+                    hasChanges = true;
+                    return;
+                }
+                const currentDisplayPos = newDisplayPlayers[index].position;
+                const targetPos = serverPlayer.position;
+                if (currentDisplayPos !== targetPos) {
+                    hasChanges = true;
+                    newDisplayPlayers[index] = { ...serverPlayer, position: currentDisplayPos };
+                } else {
+                     newDisplayPlayers[index] = serverPlayer;
+                     hasChanges = true;
+                }
+            });
+            return hasChanges ? newDisplayPlayers : prevDisplayPlayers;
+        });
+      } else {
+        // Init
+        const initialGridData = {};
+        GRID_LAYOUT.forEach(item => {
+          initialGridData[item.id] = {
+            label: item.defaultLabel,
+            color: item.defaultColor,
+            sound: item.defaultSound,
+            textColor: item.textColor,
+            image: item.defaultImage || ''
+          };
+        });
+        setDoc(gameDocRef, {
+          players: [],
+          gridData: initialGridData,
+          sentences: DEFAULT_SENTENCES,
+          currentTurnIndex: 0,
+          diceValue: 1,
+          isRolling: false,
+          lastActionTimestamp: Date.now(),
+          revealedCells: {}
+        }, { merge: true }).catch(e => console.error("Init Error:", e));
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Animation Loop
+  useEffect(() => {
+      if (gameState.players.length === 0) return;
+      const moveInterval = setInterval(() => {
+          setDisplayPlayers(prev => {
+              const nextPlayers = [...prev];
+              let updated = false;
+              gameState.players.forEach((targetPlayer, index) => {
+                  if (!nextPlayers[index]) return;
+                  const currentPos = nextPlayers[index].position;
+                  const targetPos = targetPlayer.position;
+                  if (currentPos !== targetPos) {
+                      let nextPos = (currentPos + 1) % PATH_ORDER.length;
+                      nextPlayers[index] = { ...nextPlayers[index], position: nextPos };
+                      updated = true;
+                      if (stepAudioRef.current) {
+                          stepAudioRef.current.currentTime = 0;
+                          stepAudioRef.current.play().catch(() => {});
+                      }
+                  }
+              });
+              return updated ? nextPlayers : prev;
+          });
+      }, 400);
+      return () => clearInterval(moveInterval);
+  }, [gameState.players]);
+
+  // Actions
+  const playSound = (url) => {
+    if (!url) return;
+    if (audioRef.current) {
+      audioRef.current.src = url;
+      audioRef.current.play().catch(e => console.log("Audio play error", e));
+    }
+  };
+
+  const playBGM = () => {
+     if (bgmRef.current) {
+        if (bgmRef.current.paused) {
+            bgmRef.current.volume = 0.3;
+            bgmRef.current.play().catch(e => console.log("BGM play error", e));
+        } else {
+            bgmRef.current.pause();
+        }
+     }
+  };
+
+  const toggleCellReveal = async (cellId) => {
+      try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        const currentStatus = gameState.revealedCells[cellId] || false;
+        await setDoc(gameDocRef, {
+            revealedCells: {
+                ...gameState.revealedCells,
+                [cellId]: !currentStatus
+            }
+        }, { merge: true });
+      } catch (e) { console.error("Reveal Error:", e); }
+  };
+
+  const joinGame = async () => {
+    if (!user || !localPlayerName.trim()) return;
+    try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        const currentPlayerCount = gameState.players.length;
+        const colorIndex = currentPlayerCount % PLAYER_COLORS.length;
+        const assignedColor = PLAYER_COLORS[colorIndex].value;
+        const newPlayer = { id: user.uid, name: localPlayerName, color: assignedColor, position: 0, score: 0 };
+        
+        const existingPlayer = gameState.players.find(p => p.id === user.uid);
+        if (!existingPlayer) {
+            await setDoc(gameDocRef, { players: arrayUnion(newPlayer) }, { merge: true });
+        }
+    } catch(e) { console.error("Join Error:", e); }
+  };
+
+  const createDemoTeams = async () => {
+    if (!user) return;
+    if (!confirm("確定要建立3組演示玩家嗎？目前的玩家列表將被重置。")) return;
+    try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        const demoTeamNames = ["第1組 Dakoc", "第2組 Laway", "Ohay"];
+        const demoPlayers = [
+            { id: user.uid, name: demoTeamNames[0], color: PLAYER_COLORS[0].value, position: 0, score: 0 },
+            { id: 'demo-player-2', name: demoTeamNames[1], color: PLAYER_COLORS[1].value, position: 0, score: 0 },
+            { id: 'demo-player-3', name: demoTeamNames[2], color: PLAYER_COLORS[2].value, position: 0, score: 0 }
+        ];
+        await setDoc(gameDocRef, { players: demoPlayers, currentTurnIndex: 0, diceValue: 1, isRolling: false }, { merge: true });
+    } catch(e) { console.error("Demo Error:", e); }
+  };
+
+  // 啟動手動建立的名單
+  const startCustomGame = async (customPlayers) => {
+      if (!user) return;
+      if (customPlayers.length === 0) return;
+
+      try {
+          const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+          
+          // 將第一位玩家綁定為當前使用者 (老師)，確保能進入遊戲畫面
+          const playersWithHost = customPlayers.map((p, index) => {
+              if (index === 0) {
+                  return { ...p, id: user.uid };
+              }
+              return { ...p, id: `manual-player-${index}` };
+          });
+
+          await setDoc(gameDocRef, { 
+              players: playersWithHost, 
+              currentTurnIndex: 0, 
+              diceValue: 1, 
+              isRolling: false 
+          }, { merge: true });
+          
+          setShowSetupModal(false); // 關閉視窗
+      } catch(e) { console.error("Custom Game Error:", e); }
+  };
+
+  const updatePlayersList = async (newPlayers) => {
+      try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        await updateDoc(gameDocRef, { players: newPlayers });
+      } catch(e) { console.error("Update Player Error:", e); }
+  };
+
+  const rollDice = async () => {
+    if (gameState.players.length === 0 || gameState.isRolling) return;
+    try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        await updateDoc(gameDocRef, { isRolling: true });
+        setTimeout(async () => {
+          const roll = Math.floor(Math.random() * 6) + 1;
+          await runTransaction(db, async (transaction) => {
+            const sfDoc = await transaction.get(gameDocRef);
+            if (!sfDoc.exists()) return;
+            const data = sfDoc.data();
+            const players = data.players;
+            const currentIndex = data.currentTurnIndex;
+            const currentPathIndex = players[currentIndex].position;
+            let newPathIndex = (currentPathIndex + roll) % PATH_ORDER.length;
+            players[currentIndex].position = newPathIndex;
+            const nextIndex = (currentIndex + 1) % players.length;
+            transaction.update(gameDocRef, { diceValue: roll, players: players, isRolling: false, currentTurnIndex: nextIndex, lastActionTimestamp: Date.now() });
+          });
+        }, 1000);
+    } catch(e) {
+        console.error("Roll Dice Error:", e);
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        updateDoc(gameDocRef, { isRolling: false }).catch(()=>{});
+    }
+  };
+
+  const updateGridCell = async (cellId, newData) => {
+    try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        await updateDoc(gameDocRef, { [`gridData.${cellId}`]: newData });
+        setSelectedCell(null);
+    } catch(e) { console.error("Update Grid Error:", e); }
+  };
+
+  const updateSentence = async (index, newText) => {
+    try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        const newSentences = [...gameState.sentences];
+        newSentences[index] = newText;
+        await updateDoc(gameDocRef, { sentences: newSentences });
+        setEditingSentenceIndex(null);
+    } catch(e) { console.error("Update Sentence Error:", e); }
+  };
+
+  const resetGame = async () => {
+     if(!confirm("確定要重置遊戲嗎？所有玩家分數和位置將歸零。")) return;
+     try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        const resetPlayers = gameState.players.map(p => ({...p, position: 0, score: 0}));
+        await updateDoc(gameDocRef, { players: resetPlayers, currentTurnIndex: 0, diceValue: 1, lastActionTimestamp: Date.now(), revealedCells: {} });
+     } catch(e) { console.error("Reset Error:", e); }
+  };
+  
+  const updateScore = async (playerIndex, delta) => {
+      try {
+        const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'monopoly_games', ROOM_ID);
+        const newPlayers = [...gameState.players];
+        newPlayers[playerIndex].score = (newPlayers[playerIndex].score || 0) + delta;
+        await updateDoc(gameDocRef, { players: newPlayers });
+      } catch(e) { console.error("Update Score Error:", e); }
+  };
+
+  const gridCells = useMemo(() => {
+    return GRID_LAYOUT.map(layoutItem => {
+      const dynamicData = gameState.gridData[layoutItem.id] || {};
+      return {
+        ...layoutItem,
+        label: dynamicData.label || layoutItem.defaultLabel,
+        color: dynamicData.color || layoutItem.defaultColor,
+        sound: dynamicData.sound || layoutItem.defaultSound,
+        textColor: layoutItem.textColor || 'white',
+        image: dynamicData.image || layoutItem.defaultImage || ''
+      };
+    });
+  }, [gameState.gridData]);
+
+  const currentPlayer = gameState.players[gameState.currentTurnIndex];
+  const isJoined = gameState.players.some(p => p.id === user?.uid);
+
+  const toggleSentence = (direction) => {
+    const sentences = gameState.sentences || DEFAULT_SENTENCES;
+    if (direction === 'next') setCurrentSentenceIndex((prev) => (prev + 1) % sentences.length);
+    else setCurrentSentenceIndex((prev) => (prev - 1 + sentences.length) % sentences.length);
+  };
+
+  const getSentenceStyle = (index) => {
+      if (index === 0) return "bg-amber-500 text-white"; 
+      if (index === 1) return "bg-teal-600 text-white";
+      return "bg-slate-700 text-white";
+  };
+
+  const getFontSize = (text) => {
+      if (!text) return 'text-xl';
+      if (text.length > 50) return 'text-[10px] leading-tight'; 
+      if (text.length > 20) return 'text-sm leading-tight';
+      return 'text-lg md:text-xl';
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-200 flex flex-col items-center justify-center p-4 font-serif text-slate-800">
+      <style>{styles}</style>
+      <audio ref={audioRef} hidden />
+      <audio ref={stepAudioRef} src="https://res.cloudinary.com/dm1ksvptk/video/upload/v1749665342/wood_tap.mp3" hidden />
+      <audio ref={bgmRef} loop src="https://res.cloudinary.com/dm1ksvptk/video/upload/qjvepdbirtbhxuhahc7l.mp3" />
+
+      {/* Header */}
+      <div className="w-full max-w-4xl mb-6 px-2">
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-4">
+                <img src="https://res.cloudinary.com/dm1ksvptk/image/upload/v1749659604/vxem1akzssudvs0neffn.png" alt="Rolla Moggi Logo" className="w-16 h-16 rounded-full border-2 border-white shadow-md object-cover"/>
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-wide text-center md:text-left">馬蘭阿美語 生活會話篇 第11課</h1>
+                    <p className="text-slate-600 font-medium flex items-center gap-2 mt-1"><Users className="w-4 h-4" /> 授課教師：蘿拉麻吉 Sonay Rolla Moggi</p>
+                </div>
+            </div>
+            <div className="flex gap-2">
+                {isJoined && <button onClick={() => setShowPlayerModal(true)} className="p-3 bg-white rounded-full shadow hover:bg-blue-50 text-blue-600 transition-colors" title="管理學生名單"><UserCog className="w-6 h-6"/></button>}
+                <button onClick={playBGM} className="p-3 bg-white rounded-full shadow hover:bg-blue-50 text-blue-600 transition-colors" title="背景音樂"><Music className="w-6 h-6"/></button>
+                <button onClick={() => setIsEditing(!isEditing)} className={`p-3 rounded-full shadow transition-colors ${isEditing ? 'bg-yellow-500 text-white' : 'bg-white text-slate-600 hover:bg-gray-50'}`} title="編輯模式"><Settings className="w-6 h-6" /></button>
+            </div>
+        </div>
+      </div>
+
+      {/* Main Game Area */}
+      {isJoined ? (
+        <div className="w-full flex flex-col items-center">
+            {/* Status Bar */}
+            <div className="w-full max-w-4xl bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-wrap justify-between items-center gap-4 border-l-4 border-blue-500">
+               <div className="flex items-center gap-3">
+                  <div className="text-lg font-bold text-slate-700">當前回合: </div>
+                  {currentPlayer && <span className="px-4 py-1.5 rounded-full text-white font-bold flex items-center gap-2 shadow-sm text-lg" style={{backgroundColor: currentPlayer.color}}>{currentPlayer.name}</span>}
+               </div>
+               <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto">
+                  {gameState.players.map((p, idx) => (
+                      <div key={p.id} className="flex flex-col items-center p-2 bg-slate-50 rounded-lg border border-slate-100 min-w-[70px]">
+                          <div className="flex items-center gap-1 mb-1">
+                              <div className="w-3 h-3 rounded-full" style={{backgroundColor: p.color}}></div>
+                              <span className="text-xs font-bold truncate max-w-[60px]">{p.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                              <button onClick={() => updateScore(idx, -1)} className="w-5 h-5 bg-red-100 text-red-600 rounded flex items-center justify-center hover:bg-red-200">-</button>
+                              <span className="font-mono font-bold text-lg w-6 text-center">{p.score}</span>
+                              <button onClick={() => updateScore(idx, 1)} className="w-5 h-5 bg-green-100 text-green-600 rounded flex items-center justify-center hover:bg-green-200">+</button>
+                          </div>
+                      </div>
+                  ))}
+               </div>
+            </div>
+
+            {/* Grid */}
+            <div className="game-grid relative">
+               {gridCells.map(cell => {
+                 const playersHere = displayPlayers.filter(p => PATH_ORDER[p.position] === cell.id);
+                 const isRevealed = gameState.revealedCells[cell.id] || false;
+                 const hasImage = !!cell.image;
+                 return (
+                   <div key={cell.id} className="grid-cell wood-texture" style={{ gridArea: cell.area, backgroundColor: cell.color }} onClick={() => {
+                        if(isEditing) { setSelectedCell(cell); } else {
+                            playSound(cell.sound);
+                            if(hasImage) { toggleCellReveal(cell.id); }
+                            const el = document.getElementById(`cell-${cell.id}`);
+                            if(el) { el.classList.add('active'); setTimeout(() => el.classList.remove('active'), 300); }
+                        }
+                     }} id={`cell-${cell.id}`}>
+                     {isEditing && <div className="absolute top-1 right-1 bg-white/80 p-1 rounded-full shadow-sm z-20"><Edit3 className="w-3 h-3 text-gray-600"/></div>}
+                     <div className="flex flex-col items-center justify-center w-full h-full pt-1 pointer-events-none z-0 relative">
+                         {!isRevealed && <span className={`font-bold drop-shadow-md text-center px-1 break-words w-full ${getFontSize(cell.label)}`} style={{ color: cell.textColor }}>{cell.label}</span>}
+                         {hasImage && isRevealed && <img src={cell.image} alt="" className="absolute inset-0 w-full h-full object-cover rounded-lg z-10" />}
+                     </div>
+                     <div className="token-container z-20">
+                        {playersHere.map(p => <div key={p.id} className="player-token" style={{backgroundColor: p.color}} title={p.name}></div>)}
+                     </div>
+                   </div>
+                 );
+               })}
+
+               {/* Center */}
+               <div className="grid-center">
+                  <div className={`w-full max-w-xs rounded-xl p-4 mb-4 shadow-lg text-center relative group transition-colors duration-300 ${getSentenceStyle(currentSentenceIndex)}`} onClick={() => { if(isEditing) setEditingSentenceIndex(currentSentenceIndex); }}>
+                      {isEditing && <div className="absolute top-1 right-1 bg-white/30 p-1 rounded-full cursor-pointer hover:bg-white/50"><Edit3 className="w-4 h-4 text-white"/></div>}
+                      <div className="text-white/80 text-sm mb-2 font-bold uppercase tracking-wider border-b border-white/20 pb-1">句型練習 ({currentSentenceIndex + 1}/{gameState.sentences.length})</div>
+                      <div className="flex items-center justify-between">
+                          <button onClick={(e) => { e.stopPropagation(); toggleSentence('prev'); }} className="text-white/50 hover:text-white transition-colors p-1"><ChevronLeft className="w-8 h-8" /></button>
+                          <div className="text-white font-bold text-2xl md:text-3xl px-2 min-h-[4rem] flex items-center justify-center drop-shadow-md leading-tight">{gameState.sentences[currentSentenceIndex]}</div>
+                          <button onClick={(e) => { e.stopPropagation(); toggleSentence('next'); }} className="text-white/50 hover:text-white transition-colors p-1"><ChevronRight className="w-8 h-8" /></button>
+                      </div>
+                  </div>
+                  <div className="mb-4 relative w-20 h-20 md:w-24 md:h-24 flex items-center justify-center cursor-pointer" onClick={rollDice}>
+                      <div className="absolute -top-3 -right-12 bg-yellow-400 text-amber-900 px-3 py-1 rounded-sm font-bold shadow-md transform rotate-12 z-20 border-2 border-white text-sm whitespace-nowrap animate-bounce" style={{animationDuration: '2s'}}>ira ko...</div>
+                      <div className={`dice-3d w-full h-full bg-orange-100 rounded-xl border-4 border-amber-800 flex items-center justify-center shadow-lg ${gameState.isRolling ? 'rolling' : ''}`}>
+                          <div className="grid grid-cols-3 grid-rows-3 gap-1 p-3 w-full h-full">
+                              {[...Array(9)].map((_, i) => {
+                                  const val = gameState.diceValue;
+                                  let show = false;
+                                  if (i === 4 && (val === 1 || val === 3 || val === 5)) show = true;
+                                  if ((i === 0 || i === 8) && (val > 1)) show = true;
+                                  if ((i === 2 || i === 6) && (val > 3)) show = true;
+                                  if ((i === 3 || i === 5) && (val === 6)) show = true;
+                                  return <div key={i} className="flex items-center justify-center">{show && <div className="w-3 h-3 md:w-4 md:h-4 bg-amber-900 rounded-full"></div>}</div>;
+                              })}
+                          </div>
+                      </div>
+                  </div>
+                  <button onClick={rollDice} disabled={gameState.isRolling} className={`px-6 py-2 rounded-full text-base font-bold shadow-lg transform transition-all whitespace-nowrap ${gameState.isRolling ? 'bg-gray-500 cursor-not-allowed scale-95' : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white hover:scale-105 active:scale-95'}`}>{gameState.isRolling ? '...' : '擲骰子'}</button>
+                  <div className="mt-6 flex gap-4"><button onClick={resetGame} className="text-gray-400 hover:text-white flex items-center gap-1 text-sm bg-black/20 px-3 py-1 rounded-full"><RotateCcw className="w-3 h-3"/> 重置遊戲</button></div>
+               </div>
+            </div>
+        </div>
+      ) : (
+        /* Login Screen */
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center border-t-8 border-amber-500 relative">
+             <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-slate-100 overflow-hidden"><img src="https://res.cloudinary.com/dm1ksvptk/image/upload/v1749659604/vxem1akzssudvs0neffn.png" alt="Logo" className="w-full h-full object-cover"/></div>
+             <h2 className="text-2xl font-bold text-gray-800 mb-1">歡迎來到族語大富翁</h2>
+             <p className="text-gray-500 mb-4">馬蘭阿美語 生活會話篇 第11課</p>
+             <div className="mb-6 flex flex-col items-center justify-center bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/game`} alt="Scan to join" className="w-32 h-32 mb-2 opacity-80"/><span className="text-xs text-gray-500 flex items-center gap-1"><QrCode className="w-3 h-3"/> 掃描加入遊戲 (學生用)</span></div>
+             <div className="border-t border-gray-200 my-4 pt-4">
+                <p className="text-sm font-bold text-gray-600 mb-3">教師演示區</p>
+                <div className="flex gap-2 mb-4">
+                    <button onClick={createDemoTeams} className="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"><Zap className="fill-current w-5 h-5" /> 演示模式 (3組)</button>
+                    <button onClick={() => setShowSetupModal(true)} className="flex-1 bg-teal-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-teal-700 transition-all flex items-center justify-center gap-2"><PenTool className="fill-current w-5 h-5" /> 手動建立名單</button>
+                </div>
+             </div>
+             <div className="relative flex py-2 items-center"><div className="flex-grow border-t border-gray-300"></div><span className="flex-shrink-0 mx-4 text-gray-400 text-xs">或單獨加入 (最多7組)</span><div className="flex-grow border-t border-gray-300"></div></div>
+             <div className="mb-4 mt-2"><input type="text" placeholder="輸入隊伍名稱" className="w-full text-center text-lg border-2 border-gray-200 rounded-xl p-3 focus:border-amber-500 outline-none" value={localPlayerName} onChange={e => setLocalPlayerName(e.target.value)} onKeyDown={e => e.key === 'Enter' && joinGame()}/></div>
+             <button onClick={joinGame} disabled={!localPlayerName.trim()} className="w-full bg-amber-500 text-white text-xl font-bold py-3 rounded-xl shadow-lg hover:bg-amber-600 disabled:opacity-50 transition-all flex items-center justify-center gap-2"><Play className="fill-current w-5 h-5" /> 開始遊戲</button>
+             <p className="mt-4 text-xs text-gray-400">目前已有 {gameState.players.length} 組玩家加入</p>
+        </div>
+      )}
+      {isEditing && selectedCell && <EditModal selectedCell={selectedCell} onClose={() => setSelectedCell(null)} onSave={updateGridCell} />}
+      {isEditing && editingSentenceIndex !== null && <SentenceEditModal index={editingSentenceIndex} sentence={gameState.sentences[editingSentenceIndex]} onClose={() => setEditingSentenceIndex(null)} onSave={updateSentence} />}
+      {showPlayerModal && <PlayerListModal players={gameState.players} onClose={() => setShowPlayerModal(false)} onUpdatePlayers={updatePlayersList} />}
+      
+      {/* 新增：啟動畫面時的手動設定 Modal (重複使用 PlayerListModal，但傳入不同的回調) */}
+      {showSetupModal && (
+          <PlayerListModal 
+             players={[]} 
+             onClose={() => setShowSetupModal(false)} 
+             onUpdatePlayers={startCustomGame}
+             title="手動建立名單 (教師用)"
+             confirmLabel="建立並開始遊戲"
+          />
+      )}
+    </div>
+  );
+}
